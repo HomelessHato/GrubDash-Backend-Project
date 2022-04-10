@@ -6,45 +6,55 @@ const dishes = require(path.resolve("src/data/dishes-data"));
 // Use this function to assign ID's when necessary
 const nextId = require("../utils/nextId");
 
-const hasValidProperty = (property) => {
+//Validates the required body strings i.e. 'name', 'description', and 'image_url'
+const bodyHasData = (property) => {
   return (req, res, next) => {
-    const { data = {} } = req.body;
-    if (property === "id") {
-      const { dishId } = req.params;
-      dishId === data[property] || !data[property]
-        ? next()
-        : next({
-            status: 400,
-            message: `Dish id does not match: ${data[property]}`,
-          });
+    const { data = {}} = req.body;
+    if(data[property] && data[property] !== ''){
+      next();
     }
-    if (data[property]) {
-      if (property === "price") {
-        data[property] > 0 && data[property] === Number(data[property])
-          ? next()
-          : next({
-              status: 400,
-              message:
-                "Dish must have a price that is an integer greater than 0",
-            });
-      } else {
-        data[property].length > 0
-          ? next()
-          : next({ status: 400, message: `Must include a ${property}` });
-      }
-    } else {
+    next({
+      status: 400,
+      message: `Dish must include a ${property}`
+    })
+  }
+}
+
+//Validates that the router param dishId, matches with the body requests `id`
+const matchingDish = (req, res, next) => {
+  const { dishId } = req.params;
+  const { data: {id} = {}} = req.body;
+  if(id){
+    if(id !== dishId){
       next({
         status: 400,
-        message: `Dish must include a ${property}`,
-      });
+        message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`,
+      })
     }
-  };
-};
+    next();
+  }else{
+    next();
+  }
+}
 
+//Validates that the body is a valid price and integer
+const validPrice = (req, res, next) => {
+  const { data: { price } = {}} = req.body;
+  if(Number(price) > 0 && typeof price === "number"){
+    next();
+  }else{
+    next({
+      status: 400,
+      message: `Dish must have a price that is an integer greater than 0`,
+    })
+  }
+}
+
+
+//Validates and checks that the dish exists
 const dishExists = (req, res, next) => {
   const { dishId } = req.params;
   const foundDish = dishes.find((dish) => dish.id === dishId);
-
   if (foundDish) {
     res.locals.dish = foundDish;
     next();
@@ -56,6 +66,7 @@ const dishExists = (req, res, next) => {
   }
 };
 
+//Post method to create new dish
 const create = (req, res) => {
   const {
     data: { name, description, price, image_url },
@@ -70,12 +81,12 @@ const create = (req, res) => {
   dishes.push(newDish);
   res.status(201).json({ data: newDish });
 };
-
+//Get one dish
 const read = (req, res) => {
   const dish = res.locals.dish;
   res.json({ data: dish });
 };
-
+//Put request handling
 const update = (req, res) => {
   const dish = res.locals.dish;
   const {
@@ -89,27 +100,27 @@ const update = (req, res) => {
 
   res.json({ data: dish });
 };
-
+//Get method to view all dishes
 const list = (req, res) => {
   res.json({ data: dishes });
 };
 
 module.exports = {
   create: [
-    hasValidProperty("name"),
-    hasValidProperty("description"),
-    hasValidProperty("price"),
-    hasValidProperty("image_url"),
+    bodyHasData("name"),
+    bodyHasData("description"),
+    validPrice,
+    bodyHasData("image_url"),
     create,
   ],
   read: [dishExists, read],
   update: [
     dishExists,
-    hasValidProperty("name"),
-    hasValidProperty("description"),
-    hasValidProperty("price"),
-    hasValidProperty("image_url"),
-    hasValidProperty("id"),
+    matchingDish,
+    bodyHasData("name"),
+    bodyHasData("description"),
+    validPrice,
+    bodyHasData("image_url"),
     update,
   ],
   list,
